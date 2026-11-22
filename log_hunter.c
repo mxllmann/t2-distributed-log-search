@@ -181,12 +181,101 @@ void run_static(int world_rank, int world_size, glob_t *results, int num_files, 
 
 void run_dynamic(int world_rank, int world_size, glob_t *results, int num_files, const char *word, FoundList *all_found)
 {
-    (void)world_rank;
-    (void)world_size;
-    (void)results;
-    (void)num_files;
-    (void)word;
-    (void)all_found;
+    if (world_rank == 0)
+    {
+        int workers = world_size - 1;
+        int next_file = 0;
+        int active_workers = 0;
+        FoundList *files_found = calloc(num_files, sizeof(FoundList));
+
+        for (int rank = 1; rank <= workers; rank++)
+        {
+            int file_index = -1;
+
+            if (next_file < num_files)
+            {
+                file_index = next_file;
+                next_file += 1;
+                active_workers += 1;
+            }
+
+            MPI_Send(&file_index, 1, MPI_INT, rank, 0, MPI_COMM_WORLD);
+        }
+
+        while (active_workers > 0)
+        {
+            int header[2];
+            MPI_Status status;
+            MPI_Recv(header, 2, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
+
+            int rank = status.MPI_SOURCE;
+            int done_index = header[0];
+            int count = header[1];
+
+            if (count > 0)
+            {
+                FoundOut *received = malloc(count * sizeof(FoundOut));
+                MPI_Recv(received, count * sizeof(FoundOut), MPI_BYTE, rank, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+                files_found[done_index].items = received;
+                files_found[done_index].count = count;
+                files_found[done_index].capacity = count;
+            }
+
+            int file_index = -1;
+
+            if (next_file < num_files)
+            {
+                file_index = next_file;
+                next_file += 1;
+            }
+            else
+            {
+                active_workers -= 1;
+            }
+
+            MPI_Send(&file_index, 1, MPI_INT, rank, 0, MPI_COMM_WORLD);
+        }
+
+        for (int f = 0; f < num_files; f++)
+        {
+            for (int j = 0; j < files_found[f].count; j++)
+            {
+                FoundOut *item = &files_found[f].items[j];
+                add_found(all_found, item->file_path, item->num_line, item->line);
+            }
+
+            free(files_found[f].items);
+        }
+
+        free(files_found);
+    }
+    else
+    {
+        while (1)
+        {
+            int file_index;
+            MPI_Recv(&file_index, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            if (file_index < 0)
+            {
+                break;
+            }
+
+            FoundList list = {NULL, 0, 0};
+            search_word(results->gl_pathv[file_index], word, &list);
+
+            int header[2] = {file_index, list.count};
+            MPI_Send(header, 2, MPI_INT, 0, 1, MPI_COMM_WORLD);
+
+            if (list.count > 0)
+            {
+                MPI_Send(list.items, list.count * sizeof(FoundOut), MPI_BYTE, 0, 2, MPI_COMM_WORLD);
+            }
+
+            free(list.items);
+        }
+    }
 }
 
 int main(int argc, char *argv[])
