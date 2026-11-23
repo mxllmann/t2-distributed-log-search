@@ -11,7 +11,7 @@
 # Opcional:
 #   sbatch --nodes=2 sdumont_busca.slurm                      (2 nos, 96 processos)
 #   sbatch --export=ALL,REPS=7,WORD="T23:59:5" sdumont_busca.slurm
-#   sbatch --export=ALL,MPI_MODULE=openmpi/4.1.6 sdumont_busca.slurm
+#   sbatch --export=ALL,MPI_MODULE=openmpi/gnu/4.1.8_gcc-12.4_cpu sdumont_busca.slurm
 #
 # WORD padrao e rara (~1 linha em 8640). Palavras comuns (ERROR, INFO, banco...)
 # geram milhoes de ocorrencias nesses dados e estouram o int do MPI_Send.
@@ -28,7 +28,7 @@
 set -e
 cd "${SLURM_SUBMIT_DIR:-.}"
 
-export MPI_MODULE=${MPI_MODULE:-openmpi}
+export MPI_MODULE=${MPI_MODULE:-openmpi/gnu/4.1.8_sequana}
 module purge >/dev/null 2>&1 || true
 module load gcc >/dev/null 2>&1 || echo "(aviso: 'module load gcc' falhou, usando o gcc do sistema)"
 module load "$MPI_MODULE" >/dev/null 2>&1 || echo "(aviso: 'module load $MPI_MODULE' falhou)"
