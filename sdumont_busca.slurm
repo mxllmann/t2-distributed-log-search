@@ -49,9 +49,9 @@ export MPIRUN=${MPIRUN:-"mpirun -np"}
 echo "=================================================================="
 echo " Nos        : ${SLURM_JOB_NODELIST:-$(hostname)}   Job: ${SLURM_JOB_ID:-local}"
 echo " Processos  : $NTASKS (1 mestre + $((NTASKS - 1)) workers)"
-echo " CPU        : $(lscpu | grep 'Model name' | sed 's/.*: *//')"
+echo " CPU        : $(LC_ALL=C lscpu | grep 'Model name' | sed 's/.*: *//')"
 echo " Compilador : $(mpicc --version | head -1)"
-echo " MPI        : $(mpirun --version 2>&1 | head -1)"
+echo " MPI        : $(mpirun --version 2>&1 | head -1)   [modulo: $MPI_MODULE]"
 echo " Busca      : \"$WORD\"   (mediana de $REPS execucoes)"
 echo " Data       : $(date)"
 echo "=================================================================="
@@ -91,7 +91,7 @@ MODOS = ["static", "dynamic"]
 
 def executa(procs, pasta, modo):
     cmd = MPIRUN + [str(procs), f"{B}/busca_logs", "--dir", pasta, "--search", WORD, "--mode", modo]
-    return subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True).stdout
+    return subprocess.run(cmd, stdout=subprocess.PIPE, universal_newlines=True, check=True).stdout
 
 def tempo(saida):
     return float(re.search(r"Tempo de execucao: ([0-9.]+)", saida).group(1))
@@ -114,7 +114,7 @@ for nome, pasta in DADOS:
     d = executa(NTASKS, pasta, "dynamic")
     total = int(re.search(r"Total de ocorrencias: (\d+)", d).group(1))
     arquivos = sorted(os.path.join(pasta, f) for f in os.listdir(pasta))
-    ref = subprocess.run(["grep", "-c", "-F", "-h", "--", WORD] + arquivos, stdout=subprocess.PIPE, text=True).stdout
+    ref = subprocess.run(["grep", "-c", "-F", "-h", "--", WORD] + arquivos, stdout=subprocess.PIPE, universal_newlines=True).stdout
     ref = sum(int(n) for n in ref.split())
     ok = sem_tempo(s) == sem_tempo(d) and total == ref
     print(f"  {nome}: {total} ocorrencias, grep = {ref} -> {'OK' if ok else 'DIFERENCA ENCONTRADA'}")
